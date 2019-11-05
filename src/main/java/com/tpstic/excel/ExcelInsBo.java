@@ -1,4 +1,4 @@
-package lab.crazyspark.excel;
+package com.tpstic.excel;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -39,16 +39,9 @@ public class ExcelInsBo extends BaseRowModel {
     @ExcelProperty(value = "sys_name", index = 12)
     private String sys_name;
 
-    public void print() {
-        System.out.println(String.format(
-                "InsBo:  company_code1%s  company_code2%s  acc_name%s  cst_no%s  license%s  bnf_name%s  bnf_type%s  shareholding_ratio%s  bnf_address%s  id_type5%s  id_no5%s  id_deadline5%s  sys_name%s",
-                company_code1, company_code2, acc_name, cst_no, license, bnf_name, bnf_type, shareholding_ratio,
-                bnf_address, id_type5, id_no5, id_deadline5, sys_name));
-    }
-
     public static List<ExcelInsBo> Exp2Excel(QueryRunner runner, ExcelWriter writer, Sheet sheet) throws SQLException {
         sheet.setSheetName("InsBo");
-        String sql = "SELECT * from tb_ins_bo";
+        String sql = "SELECT * from rpt_fxq_tb_ins_bo";
         List<ExcelInsBo> result = runner.query(sql, new BeanListHandler<ExcelInsBo>(ExcelInsBo.class));
         return result;
     }

@@ -1,5 +1,4 @@
-
-package lab.crazyspark.excel;
+package com.tpstic.excel;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -162,7 +161,7 @@ public class ExcelSusReport extends BaseRowModel {
     public static List<ExcelSusReport> Exp2Excel(QueryRunner runner, ExcelWriter writer, Sheet sheet)
             throws SQLException {
         sheet.setSheetName("SusReport");
-        String sql = "SELECT * from tb_sus_report";
+        String sql = "SELECT * from rpt_fxq_tb_sus_report";
         List<ExcelSusReport> result = runner.query(sql, new BeanListHandler<ExcelSusReport>(ExcelSusReport.class));
         return result;
     }

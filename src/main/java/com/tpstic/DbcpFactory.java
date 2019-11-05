@@ -1,42 +1,32 @@
-import java.io.FileInputStream;
+package com.tpstic;
+
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
 
 public class DbcpFactory {
-    public static Connection conn;
-    public static void init() throws Exception, IOException{
-        Properties pps = new Properties();
-        pps.load(new FileReader("dbcp.properties"));
-        BasicDataSourceFactory factory = new BasicDataSourceFactory();
-        DataSource Source = factory.createDataSource(pps);
-        conn = Source.getConnection();
-    }
-
-    public static void main(String[] args) {
-        Connection con  = conn; 
-        try {
-            PreparedStatement ps =con.prepareStatement("select * from huhu");
-            ResultSet rs = ps.executeQuery();
-            List li = new ArrayList();
-            while(rs.next()){
-                String ss = rs.getString("Sname");
-                int s2 = rs.getInt("Sage");
-                String result = ss +s2;
-                li.add(result);
-                System.out.println();
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
+	public static DataSource Source;
+	static {
+		Properties pps = new Properties();
+		try {
+			String root = System.getProperty("user.dir");
+			String FileName = "dbcp.properties";
+			String filePath = root + File.separator + "conf" + File.separator + FileName;
+			pps.load(new FileReader(filePath));
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		BasicDataSourceFactory factory = new BasicDataSourceFactory();
+		try {
+			Source = factory.createDataSource(pps);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 }

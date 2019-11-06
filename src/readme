@@ -78,4 +78,11 @@ java -jar dataProcess.jar JOURNAL_TREENODE_DATA-20190404174502.txt processType=1
 		}
 	}
 
-java -jar aml-1.0-SNAPSHOT.jar -DWorkDay=20190101 -txls -f"wine.xls"	
+cd ../target
+java -jar aml-1.0-SNAPSHOT.jar -DWorkDay=20190101 -txls -f"wine.xls"
+
+		String oldSQL = pps.getProperty(Key+"_Title");
+		System.out.println("propdddddd");
+		if (oldSQL.isEmpty()) {
+			return "";
+		}

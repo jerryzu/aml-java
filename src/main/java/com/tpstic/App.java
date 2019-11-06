@@ -5,6 +5,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -21,6 +23,8 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.dbutils.QueryRunner;
 
 public class App {
@@ -60,14 +64,12 @@ public class App {
 			case "xls":
 				Exp2Excel(file);
 				System.out.println("xls doing");
-				break; // 可选
+				break;
 			case "csv":
 				System.out.println("csv doing");
 				Exp2CSV(file);
-				break; // 可选
-			// 你可以有任意数量的case语句
-			default: // 可选
-				// 语句
+				break;
+			default:
 				System.out.println("default doing");
 			}
 		} catch (Exception ex) {
@@ -76,21 +78,59 @@ public class App {
 	}
 
 	public static void Exp2CSV(String file) {
+		{
+			QueryRunner runner = new QueryRunner(DbcpFactory.Source) {
+				@Override
+				protected ResultSet wrap(ResultSet rs) {
+					return CSVResultSet.wrap(rs);
+				}
+			};
+			Exp2CSVD(runner, "Company", file);
+			Exp2CSVD(runner, "InsRType", file);
+		}
+	}
+
+	public static void Exp2CSVD(QueryRunner runner, String table, String path) {
+
+		// private static CSVFormat csvFormat =
+		// CSVFormat.DEFAULT.withRecordSeparator('\n'); // 每条记录间隔符
+		// csvPrinter = new CSVPrinter(fileWriter, csvFormat);
 
 		String StartSheetInfo = "开始导出%s";
 		String EndSheetInfo = "已导出%s";
+		notifier.doWork(String.format(StartSheetInfo, path + "/" + table));
+		try {
+			Appendable out = new PrintWriter(table + ".csv");
+			CSVPrinter printer = CSVFormat.DEFAULT.withRecordSeparator("\r\n").print(out);
+			System.out.println("start");
+			String titleSql = AppUtils.getTitle(table);
+			String sql = AppUtils.getValue(table);
+			if (titleSql.isEmpty()) {
+				titleSql = AppUtils.getValue(table);
+			}
+			System.out.println("start");
+			Object[] res = AppUtils.Title(DbcpFactory.Source, titleSql);
+			// Object[] res = AppUtils.Title(DbcpFactory.Source, sql);
 
-		{
-			QueryRunner runner = new QueryRunner(DbcpFactory.Source);
-			// OutputStream os = new FileOutputStream(new File(file));
-			// ExcelWriter writer = new ExcelWriter(os, ExcelTypeEnum.XLSX, true);
+			System.out.println(AppUtils.toConvert(res));
+			printer.printRecord(AppUtils.toConvert(res));
 
-			notifier.doWork(String.format(StartSheetInfo, "company"));
-			// CompanyDAO.Exp2Excel(runner, writer, company);
-			CompanyDAO.writeCsv(runner, file);
-			// writer.write(companyresult, company);
-			notifier.doWork(String.format(EndSheetInfo, "company"));
+			List<Object[]> list = AppUtils.Exp2CSV(runner, sql);
+			for (Object[] objects : list) {
+				System.out.println(AppUtils.toConvert(objects));
+				printer.printRecord(AppUtils.toConvert(objects));
+			}
+			printer.flush();
+			printer.close();
+
+		} catch (
+
+		SQLException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
+		notifier.doWork(String.format(EndSheetInfo, table));
 	}
 
 	public static void Exp2Excel(String file) {

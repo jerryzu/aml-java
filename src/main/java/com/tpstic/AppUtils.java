@@ -5,15 +5,16 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Properties;
-import javax.sql.DataSource;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.google.gson.Gson;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.handlers.ArrayListHandler;
+import org.apache.commons.dbutils.handlers.MapHandler;
 
 import java.io.FileWriter;
 import java.sql.ResultSet;
@@ -24,7 +25,6 @@ import java.sql.Statement;
 public class AppUtils {
 	static Properties pps;
 
-	public static DataSource Source;
 	public static String workDay;
 	public static String beginDay;
 	public static String endDay;
@@ -87,12 +87,10 @@ public class AppUtils {
 	public static String getTitle(String Key) {
 		String macroStr = String.format("{\"workday\":%s\", \"beginday\":%s\", \"endday\":%s\"}", AppUtils.workDay,
 				AppUtils.beginDay, AppUtils.endDay);
-		String oldSQL = pps.getProperty(Key+"_Title");
-		System.out.println("propdddddd");
-		if (oldSQL.isEmpty()) {
+		String oldSQL = pps.getProperty(Key + "_Title");
+		if (oldSQL == null) {
 			return "";
 		}
-		System.out.println("propdwwwqwqwqddddd");
 		return compiling(oldSQL, macroStr);
 
 	}
@@ -119,17 +117,8 @@ public class AppUtils {
 		return result;
 	}
 
-	public static Object[] Title(DataSource ds, String sql) throws SQLException {
-		Statement st = ds.getConnection().createStatement();
-		ResultSet rs = st.executeQuery(sql + " where 1 = 2");
-		ResultSetMetaData metaData = rs.getMetaData();
-
-		int colum = metaData.getColumnCount();
-		Object[] res = new Object[colum];
-		for (int i = 1; i <= colum; i++) {
-			String columName = metaData.getColumnName(i);
-			res[i - 1] = columName;
-		}
-		return res;
+	public static Map<String, Object> Title(QueryRunner runner, String sql) throws SQLException {
+		Map<String, Object> result = runner.query(sql, new MapHandler());
+		return result;
 	}
 }

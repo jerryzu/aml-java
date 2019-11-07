@@ -3,12 +3,16 @@ package com.tpstic;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.metadata.Sheet;
@@ -26,12 +30,26 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.dbutils.handlers.MapHandler;
 
 public class App {
 	private static Notifier notifier;
 
+	public static Notifier getNotifier() {
+		return notifier;
+	}
+
+	public static void setNotifier(Notifier notifier) {
+		App.notifier = notifier;
+	}
+
 	public static void main(String[] args) throws IOException {
+		args = new String[] { "-t", "csv", "-f", "/app/work/aml-java/work/", "-DWorkDay=20190101" };
 		notifier = new Notifier();
+		CallListener a = new CallListener("aml-java");
+		notifier.regist(a);
+		App.setNotifier(notifier);
+
 		try {
 			Options options = new Options();
 			options.addOption(new Option("t", "type", true, "xls or csv"));
@@ -59,18 +77,18 @@ public class App {
 			AppUtils.workDay = WorkDay;
 			AppUtils.beginDay = BeginDay;
 			AppUtils.endDay = EndDay;
-
+			System.out.println("file" + file);
 			switch (FileType) {
 			case "xls":
 				Exp2Excel(file);
-				System.out.println("xls doing");
+				System.out.println("exporting xls");
 				break;
 			case "csv":
-				System.out.println("csv doing");
+				System.out.println("exporting csv");
 				Exp2CSV(file);
 				break;
 			default:
-				System.out.println("default doing");
+				System.out.println("please choice export filetype!");
 			}
 		} catch (Exception ex) {
 			System.out.println("Unexpected exception:" + ex.getMessage());
@@ -86,46 +104,75 @@ public class App {
 				}
 			};
 			Exp2CSVD(runner, "Company", file);
+			Exp2CSVD(runner, "InsBo", file);
+			Exp2CSVD(runner, "InsFavCst", file);
+			Exp2CSVD(runner, "InsGpol", file);
+			Exp2CSVD(runner, "InsPers", file);
+			Exp2CSVD(runner, "InsRchg", file);
+			Exp2CSVD(runner, "InsRcla", file);
+			Exp2CSVD(runner, "InsRenewal", file);
+			Exp2CSVD(runner, "InsRisk", file);
+			Exp2CSVD(runner, "InsRiskNew", file);
+			Exp2CSVD(runner, "InsRpay", file);
+			Exp2CSVD(runner, "InsRpol", file);
+			Exp2CSVD(runner, "InsRsur", file);
 			Exp2CSVD(runner, "InsRType", file);
+			Exp2CSVD(runner, "InsUnit", file);
+			Exp2CSVD(runner, "LarReport", file);
+			Exp2CSVD(runner, "SusReport", file);
 		}
 	}
 
 	public static void Exp2CSVD(QueryRunner runner, String table, String path) {
-
 		// private static CSVFormat csvFormat =
 		// CSVFormat.DEFAULT.withRecordSeparator('\n'); // 每条记录间隔符
 		// csvPrinter = new CSVPrinter(fileWriter, csvFormat);
-
-		String StartSheetInfo = "开始导出%s";
-		String EndSheetInfo = "已导出%s";
-		notifier.doWork(String.format(StartSheetInfo, path + "/" + table));
+		String filepath = path + File.separator + table + ".csv";
+		String StartSheetInfo = "生成文件%s";
+		String EndSheetInfo = "已生成文件%s";
+		notifier.doWork(String.format(StartSheetInfo, filepath));
 		try {
-			Appendable out = new PrintWriter(table + ".csv");
-			CSVPrinter printer = CSVFormat.DEFAULT.withRecordSeparator("\r\n").print(out);
-			System.out.println("start");
+			Appendable out = new PrintWriter(filepath);
+			// CSVPrinter printer =
+			// CSVFormat.DEFAULT.withRecordSeparator("\r\n").print(out);
+			FileWriter fw = new FileWriter(filepath);
 			String titleSql = AppUtils.getTitle(table);
 			String sql = AppUtils.getValue(table);
 			if (titleSql.isEmpty()) {
-				titleSql = AppUtils.getValue(table);
+				titleSql = sql + " where 1 = 2";
 			}
-			System.out.println("start");
-			Object[] res = AppUtils.Title(DbcpFactory.Source, titleSql);
-			// Object[] res = AppUtils.Title(DbcpFactory.Source, sql);
 
-			System.out.println(AppUtils.toConvert(res));
-			printer.printRecord(AppUtils.toConvert(res));
+			try {
+				Statement stat = DbcpFactory.Source.getConnection().createStatement();
+				ResultSet rs = stat.executeQuery(titleSql);
+				ResultSetMetaData metaData = rs.getMetaData();
+
+				int columnCount = metaData.getColumnCount();
+				String TitleBank = "";
+				for (int i = 1; i <= columnCount; i++) {
+					TitleBank = TitleBank + "|" + metaData.getColumnName(i);
+				}
+				// printer.printRecord( TitleBank.substring(1) );
+				fw.write(TitleBank.substring(1));
+				fw.write("\r\n");
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+
+			// Map<String, Object> res = AppUtils.Title(runner, titleSql);
+
+			// printer.printRecord(AppUtils.toConvert(res.keySet().toArray()));
 
 			List<Object[]> list = AppUtils.Exp2CSV(runner, sql);
 			for (Object[] objects : list) {
-				System.out.println(AppUtils.toConvert(objects));
-				printer.printRecord(AppUtils.toConvert(objects));
+				// printer.printRecord(AppUtils.toConvert(objects));
+				fw.write(AppUtils.toConvert(objects));
+				fw.write("\r\n");
 			}
-			printer.flush();
-			printer.close();
-
-		} catch (
-
-		SQLException e) {
+			// printer.flush();
+			// printer.close();
+			fw.close();
+		} catch (SQLException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();

@@ -44,6 +44,7 @@ public class App {
 	}
 
 	public static void main(String[] args) throws IOException {
+		// args = new String[] { "-t", "csv", "-f", "/app/work/aml-java/work/", "-DWorkDay=20190101" };
 		notifier = new Notifier();
 		CallListener a = new CallListener("aml-java");
 		notifier.regist(a);

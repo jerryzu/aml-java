@@ -78,15 +78,15 @@ public class AppUtils {
 	}
 
 	public static String getValue(String Key) {
-		String macroStr = String.format("{\"workday\":%s\", \"beginday\":%s\", \"endday\":%s\"}", AppUtils.workDay,
-				AppUtils.beginDay, AppUtils.endDay);
+		String macroStr = String.format("{\"workday\":\"%s\", \"beginday\":\"%s\", \"endday\":\"%s\"}", AppUtils.workDay,
+		AppUtils.beginDay, AppUtils.endDay);
 		String oldSQL = pps.getProperty(Key);
 		return compiling(oldSQL, macroStr);
 	}
 
 	public static String getTitle(String Key) {
-		String macroStr = String.format("{\"workday\":%s\", \"beginday\":%s\", \"endday\":%s\"}", AppUtils.workDay,
-				AppUtils.beginDay, AppUtils.endDay);
+		String macroStr = String.format("{\"workday\":\"%s\", \"beginday\":\"%s\", \"endday\":\"%s\"}", AppUtils.workDay,
+		AppUtils.beginDay, AppUtils.endDay);
 		String oldSQL = pps.getProperty(Key + "_Title");
 		if (oldSQL == null) {
 			return "";

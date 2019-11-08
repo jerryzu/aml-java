@@ -1,0 +1,187 @@
+-- *********************************************************************************
+--  文件名称: 09rpt_fxq_tb_ins_renewal_ms.sql
+--  所属主题: 中国人民银行反洗钱执法检查数据提取接口
+--  功能描述: 从保单中间表,通过保单相关方获取投保人信息,通过保单批改原因表过滤批改原因为'07'(加保业务),的批改记录,获取最终检查期所有加保业务清单
+--   表提取数据
+--            导入到 (rpt_fxq_tb_ins_renewal_ms) 表
+--  创建者:祖新合 
+--  输入: 
+--  x_rpt_fxq_tb_ins_rpol_gpol -- 保单中间表(包括个单与团单)
+--  edw_cust_ply_party  --保单相关方表
+--  ods_cthx_web_bas_edr_rsn -- 保单批改原因表
+--  ods_cthx_web_prd_prod -- 产品表
+--  rpt_fxq_tb_company_ms
+--  输出:
+--    rpt_fxq_tb_ins_renewal_ms
+--  创建日期: 2019/10/30
+--  修改日志: 
+--  修改日期: 
+--  修改人: 
+--  修改内容：
+-- 说明：
+--   本表数据范围为检查业务期限内，检查对象办理的所有的增加或追加保费、保额业务保单信息，每一条业务生成一条完整的记录，本表不含首期业务。
+
+alter table rpt_fxq_tb_ins_renewal_ms truncate partition pt{workday}000000;
+
+--  未将空值处理为-9999或＠N,用来上报前整理数据的临时表
+drop table if exists s_rpt_fxq_tb_ins_renewal_ms;
+
+create temporary table s_rpt_fxq_tb_ins_renewal_ms select * from rpt_fxq_tb_ins_renewal_ms where 1 <> 1;
+
+INSERT INTO s_rpt_fxq_tb_ins_renewal_ms(
+        company_code1,
+        company_code2,
+        company_code3,
+        company_code4,
+        pol_no,
+        app_no,
+        ins_date,
+        app_name,
+        app_cst_no,
+        app_id_type,
+        app_id_no,
+        ins_no,
+        renew_date,
+        pay_date,
+        cur_code,
+        pre_amt,
+        usd_amt,
+        tsf_flag,
+        acc_name,
+        acc_no,
+        acc_bank,
+        receipt_no,
+        endorse_no,
+        pt
+)
+select
+    m.c_dpt_cde as company_codel,-- 机构网点代码
+    co.company_code2 as company_code2, -- 金融机构编码，人行科技司制定的14位金融标准化编码  暂时取“监管机构码，机构外部码，列为空”
+    '' as company_code3,-- 保单归属机构网点代码
+    '' as company_code4,-- 受理业务机构网点代码
+    m.c_ply_no as pol_no,-- 保单号
+    m.c_app_no as app_no,-- 投保单号
+    date_format(m.t_app_tm,'%Y%m%d') as ins_date,-- 投保日期
+    a.c_acc_name as app_name,-- 投保人名称
+    a.c_cst_no as app_cst_no,-- 投保人客户号
+    case a.c_cert_cls
+    when '100111' then 22 -- 税务登记证
+    when '100112' then 21 -- 统一社会信用代码
+    when '110001' then 22 -- 组织机构代码
+    when '110002' then 22 -- 工商注册号码
+    when '110003' then 21 -- 营业执照
+    when '120001' then 11 -- 居民身份证
+    when '120002' then 13 -- 护照
+    when '120003' then 12 -- 军人证
+    when '120004' then 13 -- 回乡证
+    when '120005' then 14 -- 港澳居民居住证
+    when '120006' then 14 -- 台湾居民居住证
+    when '120009' then 18 -- 其它
+    else 22 -- 其它
+    end as app_id_type,-- 投保人身份证件类型
+    a.c_cert_cde as app_id_no,-- 投保人证件号码
+	/* 险种代码 unpass关于险种代码与产品代码*/ -- 如: tb_ins_rtype定义; 
+    case p.c_kind_no
+	when '01' then '11'
+	when '02' then '11'
+	when '03' then '10'
+	when '04' then '13'
+	when '05' then '15'
+	when '06' then '14'
+	when '07' then '14'
+	when '08' then '11'
+	when '09' then '11'
+	when '10' then '16'
+	when '11' then '12'
+	when '12' then '15'
+	when '16' then '16'
+	else '其他'
+    end as ins_no,-- 险种代码
+    '' as renew_date,-- 业务发生日期
+    '' as pay_date,-- 资金交易日期
+    case m.c_prm_cur 
+    when '01' then 'CNY' -- 人民币
+    when '02' then 'USD' -- 美元
+    when '03' then 'HKD' -- 港币
+    when '04' then 'CHF' -- 瑞士法郎
+    when '05' then 'FF' -- 法国法郎
+    when '06' then 'JPY' -- 日元
+    when '07' then 'GBP' -- 英镑
+    when '08' then 'EUR' -- 欧元
+    when '09' then 'DM' -- 德国马克
+    when '10' then 'SEK' -- 瑞典克朗
+    else 
+    '@N' -- 其它
+    end as  cur_code,-- 币种
+    m.n_prm as pre_amt,-- 本期交保费金额
+    -9999 as usd_amt,-- 折合美元金额
+	/* 现转标识 unpass*/   -- 10: 现金交保险公司; 11: 转账; 12: 现金缴款单(指客户向银行缴纳现金, 凭借银行开具的单据向保险机构办理交费业务); 13: 保险公司业务员代付。网银转账、银行柜面转账、POS刷卡、直接转账给总公司账户等情形, 应标识为转账。填写数字。
+    case m.c_pay_mde_cde when 5 then 11 else 10 end as tsf_flag,-- d.c_pay_mde_cde  as tsf_flag,-- 现转标识 --  SELECT C_CDE, C_CNM, 'codeKind' FROM  WEB_BAS_CODELIST PARTITION(pt20190818000000)   WHERE C_PAR_CDE = 'shoufeifangshi' ORDER BY C_CDE ;
+    m.acc_name         as acc_name,-- 交费账号名称
+    m.acc_no          as acc_no,-- 交费账号
+    m.acc_bank	          as acc_bank,-- 交费账户开户机构名称
+    m.c_app_no  as receipt_no,-- 作业流水号,唯一标识号
+    m.c_edr_no as endorse_no,-- 批单号
+    '{workday}000000' pt
+from x_rpt_fxq_tb_ins_rpol_gpol m
+    --  保单人员参于类型: 投保人: [个人:21, 法人:22]; 被保人: [个人:31, 法人:32, 团单被保人:33]; 受益人: [个人:41, 法人:42,团单受益人:43]; 收款人:[11]
+	inner join edw_cust_ply_party partition(pt{workday}000000) a on m.c_ply_no=a.c_ply_no and a.c_per_biztype in (21, 22)
+	inner join ods_cthx_web_bas_edr_rsn   partition(pt{workday}000000) e on m.c_edr_rsn_bundle_cde=e.c_rsn_cde and substr(m.c_prod_no,1,2)=e.c_kind_no
+	inner join ods_cthx_web_prd_prod partition(pt{workday}000000) p on m.c_prod_no=p.c_prod_no
+	left join rpt_fxq_tb_company_ms partition (pt{workday}000000) co on co.company_code1 = m.c_dpt_cde
+where e.c_rsn_cde in ('07') and m.t_app_tm between {beginday} and {endday} ;
+-- 本表数据范围为检查业务期限内，检查对象办理的所有的增加或追加保费、保额业务保单信息  
+
+-- rpt_fxq_tb_ins_renewal_ms
+insert into rpt_fxq_tb_ins_renewal_ms(
+  company_code1
+  ,company_code2
+  ,company_code3
+  ,company_code4
+  ,pol_no
+  ,app_no
+  ,ins_date
+  ,app_name
+  ,app_cst_no
+  ,app_id_type
+  ,app_id_no
+  ,ins_no
+  ,renew_date
+  ,pay_date
+  ,cur_code
+  ,pre_amt
+  ,usd_amt
+  ,tsf_flag
+  ,acc_name
+  ,acc_no
+  ,acc_bank
+  ,receipt_no
+  ,endorse_no
+  ,pt
+)
+select
+	ifnull((case when (trim(company_code1) = '') then null else trim(company_code1) end), '@N') as company_code1
+	,ifnull((case when (trim(company_code2) = '') then null else trim(company_code2) end), '@N') as company_code2
+	,ifnull((case when (trim(company_code3) = '') then null else trim(company_code3) end), '@N') as company_code3
+	,ifnull((case when (trim(company_code4) = '') then null else trim(company_code4) end), '@N') as company_code4
+	,ifnull((case when (trim(pol_no) = '') then null else trim(pol_no) end), '@N') as pol_no
+	,ifnull((case when (trim(app_no) = '') then null else trim(app_no) end), '@N') as app_no
+	,ifnull((case when (trim(ins_date) = '') then null else trim(ins_date) end), '@N') as ins_date
+	,ifnull((case when (trim(app_name) = '') then null else trim(app_name) end), '@N') as app_name
+	,ifnull((case when (trim(app_cst_no) = '') then null else trim(app_cst_no) end), '@N') as app_cst_no
+	,ifnull((case when (trim(app_id_type) = '') then null else trim(app_id_type) end), '@N') as app_id_type
+	,ifnull((case when (trim(app_id_no) = '') then null else trim(app_id_no) end), '@N') as app_id_no
+	,ifnull((case when (trim(ins_no) = '') then null else trim(ins_no) end), '@N') as ins_no
+	,ifnull((case when (trim(renew_date) = '') then null else trim(renew_date) end), '@N') as renew_date
+	,ifnull((case when (trim(pay_date) = '') then null else trim(pay_date) end), '@N') as pay_date
+	,ifnull((case when (trim(cur_code) = '') then null else trim(cur_code) end), '@N') as cur_code
+	,ifnull(pre_amt, -9999) as pre_amt
+	,ifnull(usd_amt, -9999) as usd_amt
+	,ifnull((case when (trim(tsf_flag) = '') then null else trim(tsf_flag) end), '@N') as tsf_flag
+	,ifnull((case when (trim(acc_name) = '') then null else trim(acc_name) end), '@N') as acc_name
+	,ifnull((case when (trim(acc_no) = '') then null else trim(acc_no) end), '@N') as acc_no
+	,ifnull((case when (trim(acc_bank) = '') then null else trim(acc_bank) end), '@N') as acc_bank
+	,ifnull((case when (trim(receipt_no) = '') then null else trim(receipt_no) end), '@N') as receipt_no
+	,ifnull((case when (trim(endorse_no) = '') then null else trim(endorse_no) end), '@N') as endorse_no
+	,'{workday}000000' as pt
+from s_rpt_fxq_tb_ins_renewal_ms;

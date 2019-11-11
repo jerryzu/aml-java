@@ -1,0 +1,111 @@
+-- *********************************************************************************
+--  文件名称: 05rpt_fxq_tb_ins_bo_ms.sql
+--  所属主题: 中国人民银行反洗钱执法检查数据提取接口
+--  功能描述: 没有可用有效数据源,暂停使用
+--   表提取数据
+--            导入到 () 表
+--  创建者:祖新合 
+--  输入: 
+--  输出:  
+--  创建日期: 2019/10/30
+--  修改日志: 
+--  修改日期: 
+--  修改人: 
+--  修改内容：
+--  说明： 
+--    1.取出表七、八、九、十一、十二、十三涉及的投保人、被保险人或受益人为非自然人的受益所有人信息。
+--    2.每个受益所有人增加一条记录。
+alter table rpt_fxq_tb_ins_bo_ms truncate partition pt{workday}000000;
+
+--  未将空值处理为-9999或＠N,用来上报前整理数据的临时表
+drop table if exists s_rpt_fxq_tb_ins_bo_ms;
+
+create temporary table s_rpt_fxq_tb_ins_bo_ms select * from rpt_fxq_tb_ins_bo_ms where 1 <> 1;
+
+INSERT INTO s_rpt_fxq_tb_ins_bo_ms(
+        company_code1,
+        company_code2,
+        acc_name,
+        cst_no,
+        license,
+        bnf_name,
+        bnf_type,
+        shareholding_ratio,
+        bnf_address,
+        id_type5,
+        id_no5,
+        id_deadline5,
+        sys_name,
+        pt
+)
+select 
+    u.c_dpt_cde as company_code1, -- 机构网点代码，内部的机构编码
+    co.company_code2 as company_code2, -- 金融机构编码，人行科技司制定的14位金融标准化编码  暂时取“监管机构码，机构外部码，列为空”
+    u.c_acc_name  as acc_name, -- 客户名称
+    u.c_cst_no as cst_no, -- 客户号
+	/* 依法设立或经营的执照号码 unpass*/   -- 客户身份证件号码按表4License字段要求填写。
+    u.c_buslicence_no as license,-- 营业执照号码
+    p.c_acc_name as bnf_name,-- 收益所有人姓名
+	/* 判定受益所有人方式 unpass*/  -- 11: 股权或表决权; 12: 人事、财务控制; 13: 高级管理人; 14其他
+	'14' as bnf_type,-- 判定受益所有人方式,14其他
+	/* 持股数量或表决权占比 unpass*/  -- 单位: ％。填写百分比, 保留2位小数, 如51.66, 不填写"％"符号。Bnftype=11时填写, 不等11时填写"@N"
+    null as shareholding_ratio,-- 持股数量或表决权比例
+    p.c_clnt_addr as bnf_address,-- 受益所有人住址    
+    case  p.c_cert_cls
+        when '120001' then 11 -- 居民身份证
+        when '120002' then 13 -- 护照
+        when '120003' then 12 -- 军人证
+        when '120004' then 13 -- 回乡证
+        when '120005' then 14 -- 港澳居民居住证
+        when '120006' then 14 -- 台湾居民居住证
+        when '120009' then 18 -- 其它
+    else 
+        18 -- 其它
+    end as id_type5,-- 受益所有人证件类型    
+     p.c_cert_cde as id_no5,-- 受益所有人证件号码
+    date_format(t_cert_end_date,'%Y%m%d') id_deadline5,-- 受益所有人证件有效期
+    '@N'as sys_name,-- 系统名称,
+    '{workday}000000' pt
+from edw_cust_ply_party partition(pt{workday}000000) a1 -- error about party
+    inner join edw_cust_ply_party partition(pt{workday}000000) a2 on a1.c_ply_no = a2.c_ply_no
+    left join  edw_cust_units_info partition(pt{workday}000000)  u on a1.c_cst_no = u.c_cst_no
+    left join edw_cust_pers_info partition(pt{workday}000000) p on a2.c_cst_no = p.c_cst_no
+    left join  rpt_fxq_tb_company_ms partition (pt{workday}000000) co on co.company_code1 = u.c_dpt_cde
+where a1.c_biz_type = 22 -- 10: 收款人, 21: 投保人, 22: 法人投保人, 31:被保人, 32:法人被保人, 33: 团单被保人，41: 受益人, 42: 法人受益人, 43: 团单受益人
+    and a1.c_clnt_mrk='0' -- 受益人没有客户类别区分,申请人有客户类别区分
+    and a2.c_biz_type = 43 -- 10: 收款人, 21: 投保人, 22: 法人投保人, 31:被保人, 32:法人被保人, 33: 团单被保人，41: 受益人, 42: 法人受益人, 43: 团单受益人
+    and a2.c_clnt_mrk='1'
+    and a1.t_app_tm between {beginday} and {endday} ;
+-- rpt_fxq_tb_ins_bo_ms
+insert into rpt_fxq_tb_ins_bo_ms(
+  company_code1
+  ,company_code2
+  ,acc_name
+  ,cst_no
+  ,license
+  ,bnf_name
+  ,bnf_type
+  ,shareholding_ratio
+  ,bnf_address
+  ,id_type5
+  ,id_no5
+  ,id_deadline5
+  ,sys_name
+  ,pt
+)
+select
+  ifnull((case when (trim(company_code1) = '') then null else trim(company_code1) end), '@N') as company_code1
+	,ifnull((case when (trim(company_code2) = '') then null else trim(company_code2) end), '@N') as company_code2
+	,ifnull((case when (trim(acc_name) = '') then null else trim(acc_name) end), '@N') as acc_name
+	,ifnull((case when (trim(cst_no) = '') then null else trim(cst_no) end), '@N') as cst_no
+	,ifnull((case when (trim(license) = '') then null else trim(license) end), '@N') as license
+	,ifnull((case when (trim(bnf_name) = '') then null else trim(bnf_name) end), '@N') as bnf_name
+	,ifnull((case when (trim(bnf_type) = '') then null else trim(bnf_type) end), '@N') as bnf_type
+	,ifnull(shareholding_ratio, -9999) as shareholding_ratio
+	,ifnull((case when (trim(bnf_address) = '') then null else trim(bnf_address) end), '@N') as bnf_address
+	,ifnull((case when (trim(id_type5) = '') then null else trim(id_type5) end), '@N') as id_type5
+	,ifnull((case when (trim(id_no5) = '') then null else trim(id_no5) end), '@N') as id_no5
+	,ifnull((case when (trim(id_deadline5) = '') then null else trim(id_deadline5) end), '@N') as id_deadline5
+	,ifnull((case when (trim(sys_name) = '') then null else trim(sys_name) end), '@N') as sys_name
+  ,'{workday}000000' as pt
+from s_rpt_fxq_tb_ins_bo_ms;

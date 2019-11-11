@@ -6,6 +6,13 @@
 	"configurations": [
 		{
 			"type": "java",
+			"name": "CodeLens (Launch) - smart",
+			"request": "launch",
+			"mainClass": "com.tpstic.smart",
+			"projectName": "aml"
+		},
+		{
+			"type": "java",
 			"name": "CodeLens (Launch) - CsvFileBuilder",
 			"request": "launch",
 			"mainClass": "com.tpstic.CsvFileBuilder",

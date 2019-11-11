@@ -18,12 +18,12 @@ public class CsvFileBuilder {
 
 	private static FileWriter fileWriter = null;
 	private static CSVPrinter csvPrinter = null;
-	private static CSVFormat csvFormat = CSVFormat.DEFAULT.withRecordSeparator('|').withQuote('"'); // 每条记录间隔符
+	private static CSVFormat csvFormat = CSVFormat.DEFAULT.withRecordSeparator('|').withQuote('@'); // 每条记录间隔符
 
 	public static void main(String[] args) {
 
 		Map<String, String> idName = new HashMap();
-		idName.put("1", "Java");
+		idName.put("1", "Jav""a");
 		idName.put("2", "C++");
 		idName.put("3", "Python");
 		idName.put("4", "Ruby");
